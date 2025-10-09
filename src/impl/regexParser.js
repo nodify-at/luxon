@@ -67,11 +67,11 @@ function simpleParse(...keys) {
 }
 
 // ISO and SQL parsing
-const offsetRegex = /(?:(Z)|([+-]\d\d)(?::?(\d\d))?)/;
+const offsetRegex = /(?:([Zz])|([+-]\d\d)(?::?(\d\d))?)/;
 const isoExtendedZone = `(?:${offsetRegex.source}?(?:\\[(${ianaRegex.source})\\])?)?`;
 const isoTimeBaseRegex = /(\d\d)(?::?(\d\d)(?::?(\d\d)(?:[.,](\d{1,30}))?)?)?/;
 const isoTimeRegex = RegExp(`${isoTimeBaseRegex.source}${isoExtendedZone}`);
-const isoTimeExtensionRegex = RegExp(`(?:T${isoTimeRegex.source})?`);
+const isoTimeExtensionRegex = RegExp(`(?:[Tt]${isoTimeRegex.source})?`);
 const isoYmdRegex = /([+-]\d{6}|\d{4})(?:-?(\d\d)(?:-?(\d\d))?)?/;
 const isoWeekRegex = /(\d{4})-?W(\d\d)(?:-?(\d))?/;
 const isoOrdinalRegex = /(\d{4})-?(\d{3})/;
@@ -287,6 +287,39 @@ const extractISOTimeAndOffset = combineExtractors(
 export function parseISODate(s) {
   return parse(
     s,
+    [isoYmdWithTimeExtensionRegex, extractISOYmdTimeAndOffset],
+    [isoWeekWithTimeExtensionRegex, extractISOWeekTimeAndOffset],
+    [isoOrdinalWithTimeExtensionRegex, extractISOOrdinalDateAndTime],
+    [isoTimeCombinedRegex, extractISOTimeAndOffset]
+  );
+}
+
+// ISO Interval parsing
+
+// Note: Do not optimize the outer non-capturing group, it is necessary, because the
+// regex is combined with other regexes and contains |
+const partialIsoIntervalEndDate = /(?:(?:(\d\d)-)?(\d\d)?|(?:W(\d\d)-)?(\d)|(\d{3}))/;
+const isoIntervalEndDateTime = combineRegexes(partialIsoIntervalEndDate, isoTimeExtensionRegex);
+
+const extractPartialIsoIntervalEndDate = simpleParse(
+  "month",
+  "day",
+  "weekNumber",
+  "weekDay",
+  "ordinal"
+);
+
+const extractISOIntervalPartialDateAndTime = combineExtractors(
+  extractPartialIsoIntervalEndDate,
+  extractISOTime,
+  extractISOOffset,
+  extractIANAZone
+);
+
+export function parseISOIntervalEnd(s) {
+  return parse(
+    s,
+    [isoIntervalEndDateTime, extractISOIntervalPartialDateAndTime],
     [isoYmdWithTimeExtensionRegex, extractISOYmdTimeAndOffset],
     [isoWeekWithTimeExtensionRegex, extractISOWeekTimeAndOffset],
     [isoOrdinalWithTimeExtensionRegex, extractISOOrdinalDateAndTime],

@@ -1,5 +1,33 @@
 # Changelog
 
+# 3.7.2 (2025-07-09)
+- Fix ES6 packaging
+
+# 3.7.1 (2025-07-09)
+- Revert change in ES6 packaging
+
+# 3.7.0 (2025-07-09)
+- Added `showZeros` option to `Duration#toHuman`
+- Added `Duration#removeZeros` method.
+- Added `rounding` option to `DateTime#toRelative`
+- Added `precision` option to ISO formatting methods
+- Added `signMode` option to `Duration#toFormat`
+- Allow escaping single quotes in format strings
+- Improve output of `Info.months` and `Info.monthsFormat` for `ja` locale
+- Accept lowercase `t` as a separator in ISO strings
+- Accept lowercase `z` as an offset in ISO strings
+- Reject non-finite numbers where previously only `NaN` was rejected
+- Improve the documentation for Interval
+- Added a dark theme for the documentation site
+
+# 3.6.1 (2025-03-31)
+- Add Fallback for `minimalDays` being removed from Intl.WeekInfo
+- Fix various caches when JS keywords like "constructor" are used for names
+
+# 3.6.0 (2025-03-25)
+- Add `Interval.lastDateTime`
+- Fix a bug that could cause wrong timezone calculations when multiple timezones are in use 
+
 # 3.5.0 (2024-08-03)
 
 - Various performance improvements

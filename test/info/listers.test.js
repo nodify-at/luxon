@@ -136,21 +136,29 @@ test("Info.months respects the locale", () => {
     "১২",
   ]);
 
-  // these should arguably be 1月, 2月, etc, but this at least documents how it works
-  expect(Info.months("short", { locale: "ja-JP" })).toEqual([
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6",
-    "7",
-    "8",
-    "9",
-    "10",
-    "11",
-    "12",
-  ]);
+  // formatToParts outputs 月 as "literal" instead of "month", but it arguably is part of the name of the month.
+  // this tests that we correctly work around this
+  // see https://github.com/moment/luxon/issues/549
+  for (const locale of ["ja", "ja-JP"]) {
+    for (const length of ["long", "short", "narrow"]) {
+      for (const formatter of [Info.months, Info.monthsFormat]) {
+        expect(formatter(length, { locale })).toEqual([
+          "1月",
+          "2月",
+          "3月",
+          "4月",
+          "5月",
+          "6月",
+          "7月",
+          "8月",
+          "9月",
+          "10月",
+          "11月",
+          "12月",
+        ]);
+      }
+    }
+  }
 
   expect(Info.monthsFormat("long", { locale: "ru" })).toEqual([
     "января",

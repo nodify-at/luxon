@@ -283,6 +283,86 @@ test("Duration#toFormat returns a lame string for invalid durations", () => {
   expect(Duration.invalid("because").toFormat("yy")).toBe("Invalid Duration");
 });
 
+// - signMode negativeLargestOnly
+
+test("Duration#toFormat shows negative sign on the largest unit when using signMode negativeLargestOnly", () => {
+  expect(
+    Duration.fromObject({ years: -3, seconds: -45 }).toFormat("yyss", {
+      signMode: "negativeLargestOnly",
+    })
+  ).toBe("-0345");
+  expect(
+    Duration.fromObject({ years: -3, seconds: -45 }).toFormat("'before'yy'between'ss'after'", {
+      signMode: "negativeLargestOnly",
+    })
+  ).toBe("before-03between45after");
+  // Intentionally have the seconds not first to make sure years is still picked as the largest unit
+  expect(
+    Duration.fromObject({ seconds: -45, years: -3 }).toFormat("ssyy", {
+      signMode: "negativeLargestOnly",
+    })
+  ).toBe("45-03");
+});
+
+test("Duration#toFormat shows no negative sign on the largest unit when using signMode negativeLargestOnly with positive Duration", () => {
+  expect(
+    Duration.fromObject({ years: 3, seconds: 45 }).toFormat("yyss", {
+      signMode: "negativeLargestOnly",
+    })
+  ).toBe("0345");
+  expect(
+    Duration.fromObject({ years: 3, seconds: 45 }).toFormat("'before'yy'between'ss'after'", {
+      signMode: "negativeLargestOnly",
+    })
+  ).toBe("before03between45after");
+  // Intentionally have the seconds not first to make sure years is still picked as the largest unit
+  expect(
+    Duration.fromObject({ years: 3, seconds: 45 }).toFormat("ssyy", {
+      signMode: "negativeLargestOnly",
+    })
+  ).toBe("4503");
+});
+
+// - signMode all
+
+test("Duration#toFormat with signMode all shows positive sign on positive durations", () => {
+  expect(
+    Duration.fromObject({ years: 3, seconds: 45 }).toFormat("yyss", {
+      signMode: "all",
+    })
+  ).toBe("+03+45");
+  expect(
+    Duration.fromObject({ years: 3, seconds: 45 }).toFormat("'before'yy'between'ss'after'", {
+      signMode: "all",
+    })
+  ).toBe("before+03between+45after");
+  // Intentionally have the seconds not first to make sure years is still picked as the largest unit
+  expect(
+    Duration.fromObject({ years: 3, seconds: 45 }).toFormat("ssyy", {
+      signMode: "all",
+    })
+  ).toBe("+45+03");
+});
+
+test("Duration#toFormat with signMode all shows positive sign on negative durations", () => {
+  expect(
+    Duration.fromObject({ years: -3, seconds: -45 }).toFormat("yyss", {
+      signMode: "all",
+    })
+  ).toBe("-03-45");
+  expect(
+    Duration.fromObject({ years: -3, seconds: -45 }).toFormat("'before'yy'between'ss'after'", {
+      signMode: "all",
+    })
+  ).toBe("before-03between-45after");
+  // Intentionally have the seconds not first to make sure years is still picked as the largest unit
+  expect(
+    Duration.fromObject({ years: -3, seconds: -45 }).toFormat("ssyy", {
+      signMode: "all",
+    })
+  ).toBe("-45-03");
+});
+
 //------
 // #humanize()
 //------
@@ -309,8 +389,93 @@ test("Duration#toHuman accepts number format opts", () => {
   );
 });
 
+test("Duration#toHuman accepts hiding of zero values", () => {
+  expect(
+    Duration.fromObject({
+      years: 1,
+      months: 0,
+      weeks: 1,
+      days: 0,
+      hours: 4,
+      minutes: 0,
+      seconds: 6,
+      milliseconds: 0,
+    }).toHuman({ showZeros: false })
+  ).toEqual("1 year, 1 week, 4 hours, 6 seconds");
+});
+
+test("Duration#toHuman handles undefined showZeros", () => {
+  expect(
+    Duration.fromObject({
+      years: 1,
+      months: 0,
+      weeks: 1,
+      days: 0,
+      hours: 4,
+      minutes: 0,
+      seconds: 6,
+      milliseconds: 0,
+    }).toHuman({ showZeros: undefined })
+  ).toEqual("1 year, 0 months, 1 week, 0 days, 4 hours, 0 minutes, 6 seconds, 0 milliseconds");
+});
+
 test("Duration#toHuman works in differt languages", () => {
   expect(dur().reconfigure({ locale: "fr" }).toHuman()).toEqual(
     "1 an, 2 mois, 1 semaine, 3 jours, 4 heures, 5 minutes, 6 secondes, 7 millisecondes"
   );
+});
+
+test("Duration#toHuman handles quarters", () => {
+  expect(
+    Duration.fromObject({
+      years: 1,
+      quarters: 2,
+      hours: 2,
+    }).toHuman()
+  ).toEqual("1 year, 6 months, 2 hours");
+});
+
+test("Duration#toHuman handles quarters and months together", () => {
+  expect(
+    Duration.fromObject({
+      years: 1,
+      months: 1,
+      quarters: 2,
+      hours: 2,
+    }).toHuman()
+  ).toEqual("1 year, 7 months, 2 hours");
+});
+
+test("Duration#toHuman handles quarters and months with showZeros false", () => {
+  expect(
+    Duration.fromObject({
+      years: 1,
+      months: 1,
+      quarters: 0,
+      hours: 2,
+    }).toHuman({ showZeros: false })
+  ).toEqual("1 year, 1 month, 2 hours");
+  expect(
+    Duration.fromObject({
+      years: 1,
+      months: 0,
+      quarters: 1,
+      hours: 2,
+    }).toHuman({ showZeros: false })
+  ).toEqual("1 year, 3 months, 2 hours");
+  expect(
+    Duration.fromObject({
+      years: 1,
+      months: 0,
+      quarters: 0,
+      hours: 2,
+    }).toHuman({ showZeros: false })
+  ).toEqual("1 year, 2 hours");
+  expect(
+    Duration.fromObject({
+      years: 1,
+      quarters: 0,
+      hours: 2,
+    }).toHuman({ showZeros: false })
+  ).toEqual("1 year, 2 hours");
 });

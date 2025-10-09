@@ -1,12 +1,13 @@
 import { formatOffset, parseZoneInfo, isUndefined, objToLocalTS } from "../impl/util.js";
 import Zone from "../zone.js";
 
-let dtfCache = {};
-function makeDTF(zone) {
-  if (!dtfCache[zone]) {
-    dtfCache[zone] = new Intl.DateTimeFormat("en-US", {
+const dtfCache = new Map();
+function makeDTF(zoneName) {
+  let dtf = dtfCache.get(zoneName);
+  if (dtf === undefined) {
+    dtf = new Intl.DateTimeFormat("en-US", {
       hour12: false,
-      timeZone: zone,
+      timeZone: zoneName,
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -15,8 +16,9 @@ function makeDTF(zone) {
       second: "2-digit",
       era: "short",
     });
+    dtfCache.set(zoneName, dtf);
   }
-  return dtfCache[zone];
+  return dtf;
 }
 
 const typeToPos = {
@@ -52,7 +54,7 @@ function partsOffset(dtf, date) {
   return filled;
 }
 
-let ianaZoneCache = {};
+const ianaZoneCache = new Map();
 /**
  * A zone identified by an IANA identifier, like America/New_York
  * @implements {Zone}
@@ -63,10 +65,11 @@ export default class IANAZone extends Zone {
    * @return {IANAZone}
    */
   static create(name) {
-    if (!ianaZoneCache[name]) {
-      ianaZoneCache[name] = new IANAZone(name);
+    let zone = ianaZoneCache.get(name);
+    if (zone === undefined) {
+      ianaZoneCache.set(name, (zone = new IANAZone(name)));
     }
-    return ianaZoneCache[name];
+    return zone;
   }
 
   /**
@@ -74,8 +77,8 @@ export default class IANAZone extends Zone {
    * @return {void}
    */
   static resetCache() {
-    ianaZoneCache = {};
-    dtfCache = {};
+    ianaZoneCache.clear();
+    dtfCache.clear();
   }
 
   /**
@@ -99,23 +102,41 @@ export default class IANAZone extends Zone {
    * @return {boolean}
    */
   static isValidZone(zone) {
+    return IANAZone.normalizeZone(zone) != null;
+  }
+
+  /**
+   * Normalize the name of the provided IANA zone or return null
+   * if it is not a valid IANA zone.
+   * @param {string} zone - The string to normalize
+   * @example IANAZone.normalizeZone("America/New_York") //=> "America/New_York"
+   * @example IANAZone.normalizeZone("america/NEw_York") //=> "America/New_York"
+   * @example IANAZone.normalizeZone("EST5EDT") //=> "America/New_York"
+   * @example IANAZone.normalizeZone("Fantasia/Castle") //=> null
+   * @example IANAZone.normalizeZone("Sport~~blorp") //=> null
+   * @return {string|null}
+   */
+  static normalizeZone(zone) {
     if (!zone) {
-      return false;
+      return null;
     }
     try {
-      new Intl.DateTimeFormat("en-US", { timeZone: zone }).format();
-      return true;
+      return new Intl.DateTimeFormat("en-US", { timeZone: zone }).resolvedOptions().timeZone;
     } catch (e) {
-      return false;
+      return null;
     }
   }
 
   constructor(name) {
     super();
+    const normalizedName = IANAZone.normalizeZone(name);
     /** @private **/
-    this.zoneName = name;
+    this.valid = normalizedName != null;
+    // For backwards compatibility we only normalize in casing, otherwise would also normalize something like
+    // EST5EDT to America/New_York.
     /** @private **/
-    this.valid = IANAZone.isValidZone(name);
+    this.zoneName =
+      normalizedName && normalizedName.toLowerCase() === name.toLowerCase() ? normalizedName : name;
   }
 
   /**
@@ -178,6 +199,7 @@ export default class IANAZone extends Zone {
    * @return {number}
    */
   offset(ts) {
+    if (!this.valid) return NaN;
     const date = new Date(ts);
 
     if (isNaN(date)) return NaN;

@@ -114,6 +114,15 @@ const orderedUnits = [
 
 const reverseUnits = orderedUnits.slice(0).reverse();
 
+// This is a map of which units to convert
+// for toHuman due to missing support from Intl.
+// if value is set, then key is what to convert to and value is what to convert
+// if value is null, then key is a unit to be ignored
+const humanizeUnitConversion = {
+  months: "quarters",
+  quarters: null,
+};
+
 // clone really means "create another instance just like this one, but with these changes"
 function clone(dur, alts, clear = false) {
   // deep merge for vals
@@ -466,9 +475,13 @@ export default class Duration {
    * @param {string} fmt - the format string
    * @param {Object} opts - options
    * @param {boolean} [opts.floor=true] - floor numerical values
+   * @param {'negative'|'all'|'negativeLargestOnly'} [opts.signMode=negative] - How to handle signs
    * @example Duration.fromObject({ years: 1, days: 6, seconds: 2 }).toFormat("y d s") //=> "1 6 2"
    * @example Duration.fromObject({ years: 1, days: 6, seconds: 2 }).toFormat("yy dd sss") //=> "01 06 002"
    * @example Duration.fromObject({ years: 1, days: 6, seconds: 2 }).toFormat("M S") //=> "12 518402000"
+   * @example Duration.fromObject({ days: 6, seconds: 2 }).toFormat("d s", { signMode: "all" }) //=> "+6 +2"
+   * @example Duration.fromObject({ days: -6, seconds: -2 }).toFormat("d s", { signMode: "all" }) //=> "-6 -2"
+   * @example Duration.fromObject({ days: -6, seconds: -2 }).toFormat("d s", { signMode: "negativeLargestOnly" }) //=> "-6 2"
    * @return {string}
    */
   toFormat(fmt, opts = {}) {
@@ -488,21 +501,33 @@ export default class Duration {
    * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat#options
    * @param {Object} opts - Formatting options. Accepts the same keys as the options parameter of the native `Intl.NumberFormat` constructor, as well as `listStyle`.
    * @param {string} [opts.listStyle='narrow'] - How to format the merged list. Corresponds to the `style` property of the options parameter of the native `Intl.ListFormat` constructor.
+   * @param {boolean} [opts.showZeros=true] - Show all units previously used by the duration even if they are zero
    * @example
    * ```js
-   * var dur = Duration.fromObject({ days: 1, hours: 5, minutes: 6 })
-   * dur.toHuman() //=> '1 day, 5 hours, 6 minutes'
-   * dur.toHuman({ listStyle: "long" }) //=> '1 day, 5 hours, and 6 minutes'
-   * dur.toHuman({ unitDisplay: "short" }) //=> '1 day, 5 hr, 6 min'
+   * var dur = Duration.fromObject({ months: 1, weeks: 0, hours: 5, minutes: 6 })
+   * dur.toHuman() //=> '1 month, 0 weeks, 5 hours, 6 minutes'
+   * dur.toHuman({ listStyle: "long" }) //=> '1 month, 0 weeks, 5 hours, and 6 minutes'
+   * dur.toHuman({ unitDisplay: "short" }) //=> '1 mth, 0 wks, 5 hr, 6 min'
+   * dur.toHuman({ showZeros: false }) //=> '1 month, 5 hours, 6 minutes'
    * ```
    */
   toHuman(opts = {}) {
     if (!this.isValid) return INVALID;
 
+    const showZeros = opts.showZeros !== false;
+
     const l = orderedUnits
       .map((unit) => {
-        const val = this.values[unit];
-        if (isUndefined(val)) {
+        const convertUnit = humanizeUnitConversion[unit];
+        if (convertUnit === null) return null;
+        let val = this.values[unit];
+        if (convertUnit) {
+          const val2 = this.values[convertUnit];
+          if (val2) {
+            val = (val ?? 0) + val2 * this.matrix[convertUnit][unit];
+          }
+        }
+        if (isUndefined(val) || (val === 0 && !showZeros)) {
           return null;
         }
         return this.loc
@@ -860,6 +885,17 @@ export default class Duration {
       negated[k] = this.values[k] === 0 ? 0 : -this.values[k];
     }
     return clone(this, { values: negated }, true);
+  }
+
+  /**
+   * Removes all units with values equal to 0 from this Duration.
+   * @example Duration.fromObject({ years: 2, days: 0, hours: 0, minutes: 0 }).removeZeros().toObject() //=> { years: 2 }
+   * @return {Duration}
+   */
+  removeZeros() {
+    if (!this.isValid) return this;
+    const vals = removeZeroes(this.values);
+    return clone(this, { values: vals }, true);
   }
 
   /**
